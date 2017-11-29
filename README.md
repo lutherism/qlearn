@@ -1,6 +1,6 @@
 #### Qlearn Playground
 
-![demo gif](https://github.com/lutherism/qlearn/raw/master/public/demo.gif)
+![demo gif](https://github.com/lutherism/qlearn/raw/master/public/qlearn-snake.gif)
 
 ## Setup Steps
 
