@@ -47,8 +47,8 @@ gulp.task('server', function() {
   });
 });
 
-gulp.task('build:client', function() { return compile('./src/client/main.js', 'main.js'); });
-gulp.task('watch:client', function() { return watch('./src/client/main.js', 'main.js'); });
+gulp.task('build:client', function() { return compile('./src/client/main.js', './src/client/main.js'); });
+gulp.task('watch:client', function() { return watch('./src/client/main.js', './src/client/main.js'); });
 
 gulp.task('default', ['watch:client'], () => {
   gulp.run('server');

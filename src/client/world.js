@@ -9,14 +9,18 @@ export default class World {
 
   doAction(action) {
     const agent = this.agent;
-    const reward = {
-      'o': -0.4,
+    const newState = this.map.nextState(agent, action);
+    let reward = 0;
+    const fieldValue = {
+      'o': -0.01,
       'r': -1,
       'g': 1
-    }[this.map.nextValue(agent, action)];
-    this.agent = [agent[0] + action[0], agent[1] + action[1]];
+    };
+    reward += fieldValue[this.map.stateValue(newState)];
+    this.agent = newState;
     return {
       agent,
+      newState,
       action,
       reward
     };

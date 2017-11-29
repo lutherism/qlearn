@@ -1,34 +1,41 @@
+
+const ALPHA = 0.4;
+const discountRate = 0.1;
+const NOVELTY_REWARD = .4;
+
 export default class Policy {
-  constructor(map) {
-    this.policy = this.initPolicyFromMap(map);
+  constructor() {
+    this.policy = {};
+    this.actionHistory = [];
   }
 
-  initPolicyFromMap(map) {
-    const policy = {};
-    map.iterateStates(([rowI, collI], value) => {
-      policy[`${rowI}-${collI}`] = this.defaultActions()
-        .filter(action => {
-          const nextValue = map.nextValue([rowI, collI], action[0]);
-          if (nextValue === -1 || nextValue === 'x') {
-            return false;
-          }
-          return true;
-        });
-    });
-    return policy;
+  discritizeState(state) {
+    return JSON.stringify(state);
   }
 
-  defaultActions() {
+  possibleActions(state) {
     return [
-      [[-1, 0], 0],
-      [[0, -1], 0],
-      [[1, 0], 0],
-      [[0, 1], 0]
+      'up',
+      'down',
+      'left',
+      'right'
     ];
   }
 
-  getActionValue([rowI, collI]) {
-    const bestOptions = this.policy[`${rowI}-${collI}`].reduce((a, policy) => {
+  getActionValue(state) {
+    const discritizeState = this.discritizeState(state);
+    if (!this.policy[discritizeState]) {
+      if (this.averageSimilarPolicy) {
+        this.policy[discritizeState] = this.averageSimilarPolicy(state);
+      } else {
+        this.policy[discritizeState] = this.possibleActions(state).map(p => [p, 0]);
+      }
+    }
+    return this.policy[discritizeState];
+  }
+
+  getBestActionValue(state) {
+    const bestOptions = this.getActionValue(state).reduce((a, policy) => {
       if (!a[0] || policy[1] > a[0][1]) {
         return [policy];
       }
@@ -40,11 +47,18 @@ export default class Policy {
     return bestOptions[parseInt(Math.random() * bestOptions.length)];
   }
 
-  updatePolicy([rowI, collI], action, reward) {
-    const statePolicy = this.policy[`${rowI}-${collI}`].find(p => {
-      return p[0][0] === action[0] && p[0][1] === action[1];
+  endGame() {
+    this.actionHistory = [];
+  }
+
+  updatePolicy(...args) {
+    this.actionHistory.push(args);
+    return this.actionHistory.reverse().map(([newState, actionDecision, reward]) => {
+      const valuePrime = this.getBestActionValue(newState);
+      const learnedWeight = ((1 - ALPHA) * actionDecision[1]) +
+        (ALPHA * (reward + (discountRate * valuePrime[1])));
+      actionDecision[1] = learnedWeight;
+      return actionDecision;
     });
-    statePolicy[1] = statePolicy[1] + reward;
-    return statePolicy[1];
   }
 }
