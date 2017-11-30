@@ -1,4 +1,6 @@
 import Policy from './policy';
+const ALPHA = 0.5;
+const discountRate = 0.3;
 
 function lengthOfSimilarity(snake1, snake2) {
   let matching = true;
@@ -15,31 +17,26 @@ export default class WheelPolicy extends Policy {
     super();
   }
 
-  averageSimilarPolicy({direction, snake, food}) {
-    const origin = snake[0];
+  possibleActions(state) {
+    return [
+      'down-straight',
+      'down-left',
+      'down-right',
+      'left',
+      'right',
+      'straight',
+      'brake',
+      'neutral'
+    ];
+  }
+
+  averageSimilarPolicy({wheelInfos}) {
     const similar = Object.keys(this.policy).reduce((a, key) => {
       const statePolicy = JSON.parse(key);
-      if (JSON.stringify(statePolicy.foodDirection) ===
-        JSON.stringify([
-          origin[0] > food[0] ? -1 : origin[0] === food[0] ? 0 : 1,
-          origin[1] > food[1] ? -1 : origin[1] === food[1] ? 0 : 1])) {
-        const origin = snake[0];
-        const relativeSnake = snake.map(b => {
-          return [b[0] - origin[0], b[1] - origin[1]];
+      if (JSON.stringify(wheelInfos) === JSON.stringify(statePolicy.wheelInfos)) {
+        a.push({
+          policy: this.policy[key]
         });
-        const ls = lengthOfSimilarity(statePolicy.snake, relativeSnake);
-        if (!a[0] || a[0].similarness === ls) {
-          a.push({
-            policy: this.policy[key],
-            similarness: lengthOfSimilarity(statePolicy.snake, relativeSnake)
-          });
-        }
-        if (a[0] && a[0].similarness < ls) {
-          a = [{
-            policy: this.policy[key],
-            similarness: lengthOfSimilarity(statePolicy.snake, relativeSnake)
-          }];
-        }
       }
       return a;
     }, []).reduce((a, s, i) => {
@@ -51,22 +48,15 @@ export default class WheelPolicy extends Policy {
     return (similar && similar.policy);
   }
 
-  discritizeState({direction, snake, food}) {
-    const origin = snake[0];
-    return JSON.stringify({
-      stepsToWall: {
-        '-1,0': () => origin[0] + 1,
-        '1,0': () => 12 - origin[0],
-        '0,-1': () => origin[1] + 1,
-        '0,1': () => 12 - origin[1],
-      }[direction.map(String).join(',')](),
-      foodDirection: [
-        origin[0] > food[0] ? -1 : origin[0] === food[0] ? 0 : 1,
-        origin[1] > food[1] ? -1 : origin[1] === food[1] ? 0 : 1],
-      //food: [food[0] - origin[0], food[1] - origin[1]],
-      snake: snake.map(b => {
-        return [b[0] - origin[0], b[1] - origin[1]];
-      })
-    });
+  discritizeState(state) {
+    return JSON.stringify(state);
+  }
+
+  updatePolicy(newState, actionDecision, reward) {
+    const valuePrime = this.getBestActionValue(newState);
+    const learnedWeight = ((1 - ALPHA) * actionDecision[1]) +
+      (ALPHA * (reward + (discountRate * valuePrime[1])));
+    actionDecision[1] = learnedWeight;
+    return actionDecision;
   }
 }

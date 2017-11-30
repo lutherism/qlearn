@@ -716,8 +716,10 @@ CANNON.Demo = function(options){
     function animate(){
         requestAnimationFrame( animate );
         if(!settings.paused){
-            updateVisuals();
-            updatePhysics();
+            for (var i = 0; i < 1000; i++) {
+              updateVisuals();
+              updatePhysics();
+            }
         }
         render();
         stats.update();

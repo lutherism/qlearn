@@ -1,5 +1,5 @@
 import React, {Component} from 'react';
-import {one, two, three, four} from './maps';
+import * as MAPS from './maps';
 import World from './world';
 import Policy from './policy';
 import WorldMap from './map';
@@ -7,13 +7,13 @@ import Cell from './components/cell';
 import Snake from 'react-snake-game';
 
 const SLEEP = 0;
-const MAP = one;
+const MAP = 'one';
 const BATCH = 20;
 
 export default class Root extends Component {
   constructor(props) {
     super(props);
-    const worldMap = new WorldMap(MAP);
+    const worldMap = new WorldMap(MAPS[MAP]);
     this.state = {
       running: false,
       worldMap: worldMap,
@@ -22,11 +22,22 @@ export default class Root extends Component {
       position: [0, 0],
       moves: [],
       score: 0,
+      sleep: SLEEP,
       wins: 0,
       losses: 0
     };
     this.handleToggleRun = this.handleToggleRun.bind(this);
+    this.handleSelectWorld = this.handleSelectWorld.bind(this);
     this.runStep = this.runStep.bind(this);
+  }
+  handleSelectWorld(e) {
+    const worldMap = new WorldMap(MAPS[e.target.value]);
+    this.setState({
+      worldMap: worldMap,
+      world: new World(worldMap),
+      policy: new Policy(worldMap),
+      position: [0, 0]
+    });
   }
   handleToggleRun() {
     this.setState({
@@ -66,15 +77,6 @@ export default class Root extends Component {
         wins: this.state.wins + 1,
         score: 0
       });
-    } else if (this.state.moves.length > 50) {
-      this.state.policy.endGame();
-      this.setState({
-        world: new World(this.state.worldMap),
-        position: [0, 0],
-        moves: [],
-        losses: this.state.losses + 1,
-        score: 0
-      });
     } else {
       this.state.moves.push([newState, actionDecision[0]])
       this.setState({
@@ -83,7 +85,7 @@ export default class Root extends Component {
       });
     }
 
-    setTimeout(this.runStep, SLEEP);
+    setTimeout(this.runStep, this.state.sleep);
   }
   render() {
     return (
@@ -91,6 +93,17 @@ export default class Root extends Component {
         <button onClick={this.handleToggleRun}>
           {'Run Training'}
         </button>
+        <label>{'World'}</label>
+        <select onChange={this.handleSelectWorld}>
+          <option value="one">One</option>
+          <option value="two">Two</option>
+          <option value="three">Three</option>
+          <option value="four">Four</option>
+          <option value="five">Five</option>
+        </select>
+        <label>{'Sleep time'}</label>
+        <input type="number" value={this.state.sleep}
+          onChange={(e) => this.setState({sleep: e.target.value})} />
         <label>
           {'Wins: '}
           <strong>{this.state.wins}</strong>

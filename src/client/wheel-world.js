@@ -9,14 +9,29 @@ class Inspector extends Demo {
   }
 }
 
+const games = [{
+  length: 1000,
+  points: [[15, 0], [24, -9], [36, 0], [21, 12], [15, 0], [0, 0],
+    [-15, 0], [-24, -9], [-36, 0], [-21, 12], [-15, 0], [0, 0]]
+}];
+
 export default class WheelWorld extends World {
   constructor(options) {
     super(options);
     this.options = options;
     this.initWorld();
     this.demo.start();
+    this.gameIdx = 0;
+    this.pointIdx = 0;
+    this.rewardFactors = {
+      distanceProgressFactor: 100,
+      orientationProgressFactor: 100
+    };
   }
   initWorld() {
+    while (this.options.firstChild) {
+      this.options.removeChild(this.options.firstChild);
+    }
     this.demo = new Demo(this.options);
     this.mass = 150;
 
@@ -102,25 +117,25 @@ export default class WheelWorld extends World {
 
         // Update wheels
         world.addEventListener('postStep', function(){
-            for (var i = 0; i < that.vehicle.wheelInfos.length; i++) {
-                that.vehicle.updateWheelTransform(i);
-                var t = that.vehicle.wheelInfos[i].worldTransform;
-                var wheelBody = wheelBodies[i];
-                wheelBody.position.copy(t.position);
-                wheelBody.quaternion.copy(t.quaternion);
-            }
+          for (var i = 0; i < that.vehicle.wheelInfos.length; i++) {
+            that.vehicle.updateWheelTransform(i);
+            var t = that.vehicle.wheelInfos[i].worldTransform;
+            var wheelBody = wheelBodies[i];
+            wheelBody.position.copy(t.position);
+            wheelBody.quaternion.copy(t.quaternion);
+          }
         });
 
         var matrix = [];
-        var sizeX = 64,
-            sizeY = 64;
+        var sizeX = 10,
+            sizeY = 10;
 
         for (var i = 0; i < sizeX; i++) {
             matrix.push([]);
             for (var j = 0; j < sizeY; j++) {
-                var height = Math.cos(i / sizeX * Math.PI * 5) * Math.cos(j/sizeY * Math.PI * 5) * 2 + 2;
+                var height = 0;
                 if(i===0 || i === sizeX-1 || j===0 || j === sizeY-1)
-                    height = 3;
+                    height = 0;
                 matrix[i].push(height);
             }
         }
@@ -133,23 +148,57 @@ export default class WheelWorld extends World {
         hfBody.position.set(-sizeX * hfShape.elementSize / 2, -sizeY * hfShape.elementSize / 2, -1);
         world.addBody(hfBody);
         that.demo.addVisual(hfBody);
+        that.lastX = that.vehicle.chassisBody.position.x;
     });
   }
-  dropFood() {
-    this.food = [parseInt(Math.random() * 12), parseInt(Math.random() * 12)];
+  dropCar() {
+    this.initWorld();
+    this.demo.start();
   }
   getState() {
+    const bodyRelativeVector = this.vehicle.chassisBody.position.vsub(
+      new CANNON.Vec3(games[this.gameIdx].points[this.pointIdx][0],
+        games[this.gameIdx].points[this.pointIdx][1],
+        this.vehicle.chassisBody.position.z));
+    const direction = Math.atan2(bodyRelativeVector.x, bodyRelativeVector.y);
     return {
-      world: this.demo.getWorld(),
-      vehicle: this.vehicle
+      interpolatedQuaternionX: this.vehicle.chassisBody
+        .interpolatedQuaternion.x.toPrecision(2),
+      interpolatedQuaternionY: this.vehicle.chassisBody
+        .interpolatedQuaternion.y.toPrecision(2),
+      interpolatedQuaternionZ: this.vehicle.chassisBody
+        .interpolatedQuaternion.z.toPrecision(2),
+      interpolatedQuaternionW: this.vehicle.chassisBody
+        .interpolatedQuaternion.w.toPrecision(2),
+      wheelInfos: this.vehicle.wheelInfos.map(i => ({
+        engineForce: i.engineForce,
+        brake: i.brake,
+        steering: i.steering
+      })),
+      pointIdx: this.pointIdx,
+      gameIdx: this.gameIdx,
+      directionToTarget: direction,
+      speed: this.vehicle.currentVehicleSpeedKmHour,
+      targetVectorDistance: bodyRelativeVector.length(),
+      currentPosition: this.vehicle.chassisBody.position,
+      targetPos: games[this.gameIdx].points[this.pointIdx]
     };
   }
-  doAction(action) {
-    var up = (action == 'keyup');
-
-    if(!up && action !== 'keydown'){
-        return;
+  getRewardFactors() {
+    return {
+      distanceProgressFactor: this.rewardFactors.distanceProgressFactor,
+      orientationProgressFactor: this.rewardFactors.orientationProgressFactor
     }
+  }
+
+  setRewardFactor(factor, n) {
+    this.rewardFactors[factor] = n;
+  }
+  doAction(action, sleep) {
+    const originalState = this.getState();
+    var maxSteerVal = 0.5;
+    var maxForce = 200;
+    var brakeForce = 1000000;
 
     this.vehicle.setBrake(0, 0);
     this.vehicle.setBrake(0, 1);
@@ -158,40 +207,121 @@ export default class WheelWorld extends World {
 
     switch(action){
 
-    case 'up': // forward
-        this.vehicle.applyEngineForce(up ? 0 : -maxForce, 2);
-        this.vehicle.applyEngineForce(up ? 0 : -maxForce, 3);
-        break;
+    case 'neutral': // forward
+      this.vehicle.applyEngineForce(0, 2);
+      this.vehicle.applyEngineForce(0, 3);
+      break;
 
-    case 'down': // backward
-        this.vehicle.applyEngineForce(up ? 0 : maxForce, 2);
-        this.vehicle.applyEngineForce(up ? 0 : maxForce, 3);
-        break;
+    case 'down-straight': // backward
+      this.vehicle.setSteeringValue(0, 0);
+      this.vehicle.setSteeringValue(0, 1);
+      this.vehicle.applyEngineForce(0, 2);
+      this.vehicle.applyEngineForce(0, 3);
+      this.vehicle.applyEngineForce(maxForce, 2);
+      this.vehicle.applyEngineForce(maxForce, 3);
+      break;
 
     case 'brake': // b
-        this.vehicle.setBrake(brakeForce, 0);
-        this.vehicle.setBrake(brakeForce, 1);
-        this.vehicle.setBrake(brakeForce, 2);
-        this.vehicle.setBrake(brakeForce, 3);
-        break;
+      this.vehicle.setBrake(brakeForce, 0);
+      this.vehicle.setBrake(brakeForce, 1);
+      this.vehicle.setBrake(brakeForce, 2);
+      this.vehicle.setBrake(brakeForce, 3);
+      break;
 
     case 'right': // right
-        this.vehicle.setSteeringValue(up ? 0 : -maxSteerVal, 0);
-        this.vehicle.setSteeringValue(up ? 0 : -maxSteerVal, 1);
-        break;
+      this.vehicle.applyEngineForce(0, 2);
+      this.vehicle.applyEngineForce(0, 3);
+      this.vehicle.applyEngineForce(-maxForce, 2);
+      this.vehicle.applyEngineForce(-maxForce, 3);
+      this.vehicle.setSteeringValue(0, 0);
+      this.vehicle.setSteeringValue(0, 1);
+      this.vehicle.setSteeringValue(-maxSteerVal, 0);
+      this.vehicle.setSteeringValue(-maxSteerVal, 1);
+      break;
+
+    case 'down-right': // right
+      this.vehicle.applyEngineForce(0, 2);
+      this.vehicle.applyEngineForce(0, 3);
+      this.vehicle.applyEngineForce(maxForce, 2);
+      this.vehicle.applyEngineForce(maxForce, 3);
+      this.vehicle.setSteeringValue(0, 0);
+      this.vehicle.setSteeringValue(0, 1);
+      this.vehicle.setSteeringValue(-maxSteerVal, 0);
+      this.vehicle.setSteeringValue(-maxSteerVal, 1);
+      break;
+
+    case 'down-left': // right
+      this.vehicle.applyEngineForce(0, 2);
+      this.vehicle.applyEngineForce(0, 3);
+      this.vehicle.applyEngineForce(maxForce, 2);
+      this.vehicle.applyEngineForce(maxForce, 3);
+      this.vehicle.setSteeringValue(0, 0);
+      this.vehicle.setSteeringValue(0, 1);
+      this.vehicle.setSteeringValue(-maxSteerVal, 0);
+      this.vehicle.setSteeringValue(-maxSteerVal, 1);
+      break;
+
+
+    case 'straight': // right
+      this.vehicle.setSteeringValue(0, 0);
+      this.vehicle.setSteeringValue(0, 1);
+      this.vehicle.applyEngineForce(0, 2);
+      this.vehicle.applyEngineForce(0, 3);
+      this.vehicle.applyEngineForce(-maxForce, 2);
+      this.vehicle.applyEngineForce(-maxForce, 3);
+
+      break;
 
     case 'left': // left
-        this.vehicle.setSteeringValue(up ? 0 : maxSteerVal, 0);
-        this.vehicle.setSteeringValue(up ? 0 : maxSteerVal, 1);
-        break;
+      this.vehicle.applyEngineForce(0, 2);
+      this.vehicle.applyEngineForce(0, 3);
+      this.vehicle.applyEngineForce(-maxForce, 2);
+      this.vehicle.applyEngineForce(-maxForce, 3);
+      this.vehicle.setSteeringValue(0, 0);
+      this.vehicle.setSteeringValue(0, 1);
+      this.vehicle.setSteeringValue(maxSteerVal, 0);
+      this.vehicle.setSteeringValue(maxSteerVal, 1);
+      break;
 
     }
-    this.dropFood();
-    return {
-      originalState,
-      newState: this.getState(),
-      action,
-      reward: -1
-    };
+
+    return new Promise((resolve, reject) => {
+      setTimeout(() => {
+        let reward = -0.1;
+        const newState = this.getState();
+        const rewardFactors = this.getRewardFactors();
+        const lastTargetVector = this.vehicle.chassisBody.previousPosition.vsub(
+          new CANNON.Vec3(games[this.gameIdx].points[this.pointIdx][0],
+            games[this.gameIdx].points[this.pointIdx][1],
+            this.vehicle.chassisBody.previousPosition.z));
+        const bodyRelativeVector = this.vehicle.chassisBody.position.vsub(
+          new CANNON.Vec3(games[this.gameIdx].points[this.pointIdx][0],
+            games[this.gameIdx].points[this.pointIdx][1],
+            this.vehicle.chassisBody.position.z));
+        reward += Math.max(Math.min(
+          (lastTargetVector.length() - bodyRelativeVector.length()) *
+          rewardFactors.distanceProgressFactor,
+        0.5),-0.5);
+        const direction = Math.atan2(bodyRelativeVector.x, bodyRelativeVector.y);
+        const lastDirection = Math.atan2(lastTargetVector.x, lastTargetVector.y);
+        const directionDif = Math.abs(1.56 - lastDirection) - Math.abs(1.56 - direction);
+        reward += Math.max(Math.min(directionDif
+          * rewardFactors.orientationProgressFactor, 0.5),-0.5);
+        console.log('target', direction, bodyRelativeVector.length());
+        if (bodyRelativeVector.length() < 1) {
+          reward = 2;
+          this.demo.restartCurrentScene();
+        }
+
+        resolve({
+          originalState: JSON.stringify(originalState),
+          newState,
+          action,
+          reward
+          //reward: Math.max(Math.min(reward, 1), -1)
+        });
+      }, action === 'pause' ? (sleep*2) :
+        action === 'longpause' ? (sleep*4) : sleep)
+    });
   }
 }

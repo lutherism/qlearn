@@ -36,13 +36,8 @@ export default class SnakeLearner extends Component {
       this.state.world.getState());
 
     const {newState, action, reward} = this.state.world.doAction(actionDecision[0]);
-
-    console.log('new policy', this.state.policy.updatePolicy(
-      newState, actionDecision, reward));
-    console.log('action', actionDecision[0]);
-    console.log('reward', reward);
-    console.log('score', this.state.score);
-
+    this.state.policy.updatePolicy(
+      newState, actionDecision, reward);
     if (reward === 1) {
       this.setState({
         wins: this.state.wins + 1,

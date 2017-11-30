@@ -1,7 +1,7 @@
 
 const ALPHA = 0.4;
-const discountRate = 0.1;
-const NOVELTY_REWARD = .4;
+const discountRate = 0.8;
+const maxMemory = 100;
 
 export default class Policy {
   constructor() {
@@ -30,6 +30,8 @@ export default class Policy {
       } else {
         this.policy[discritizeState] = this.possibleActions(state).map(p => [p, 0]);
       }
+    } else {
+      console.log('seen before');
     }
     return this.policy[discritizeState];
   }
@@ -52,7 +54,8 @@ export default class Policy {
   }
 
   updatePolicy(...args) {
-    this.actionHistory.push(args);
+    this.actionHistory.push(args)
+    this.acitonHistory = this.actionHistory.slice(maxMemory * -1);
     return this.actionHistory.reverse().map(([newState, actionDecision, reward]) => {
       const valuePrime = this.getBestActionValue(newState);
       const learnedWeight = ((1 - ALPHA) * actionDecision[1]) +

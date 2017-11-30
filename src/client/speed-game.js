@@ -1,6 +1,6 @@
 import React, {Component} from 'react';
 import {one, two, three, four} from './maps';
-import WheelWorld from './wheel-world';
+import SpeedWorld from './speed-world';
 import WheelPolicy from './wheel-net-policy';
 import Cell from './components/cell';
 import Snake from 'react-snake-game';
@@ -29,8 +29,7 @@ export default class Wheel extends Component {
     this.runStep = this.runStep.bind(this);
   }
   componentDidMount() {
-    this.world = new WheelWorld({
-      containerEl: ReactDOM.findDOMNode(this.refs.inspector),
+    this.world = new SpeedWorld({
       stepFrequency: 600
     });
     this.state.policy.loadnet(
@@ -39,16 +38,9 @@ export default class Wheel extends Component {
     this.setState({
       rewardFactors: this.world.getRewardFactors()
     });
-    setInterval(() => {
-      localStorage.setItem(
-        'qlearn-net',
-        this.state.policy.savenet()
-      );
-      this.world.demo.restartCurrentScene();
-    }, RELOAD)
     // Update wheels
     let gap = this.state.sleep;
-    this.world.demo.getWorld()
+    this.world.getWorld()
       .addEventListener('postStep', () => {
         if (gap === 0) {
           gap = this.state.sleep;
@@ -57,6 +49,7 @@ export default class Wheel extends Component {
           gap--;
         }
       });
+    this.runStep();
   }
   handleToggleRun() {
     this.setState({
@@ -92,9 +85,8 @@ export default class Wheel extends Component {
       } else {
         this.forceUpdate();
       }
+      setTimeout(this.runStep, 1);
     });
-
-    //setTimeout(this.runStep, this.state.sleep);
   }
   render() {
     return (
@@ -177,11 +169,6 @@ export default class Wheel extends Component {
             </div>
           </label>
         </div>
-        <div style={{
-          position: 'relative',
-          height : 900,
-          width  : 900
-        }} ref='inspector'></div>
       </div>
     );
   }
